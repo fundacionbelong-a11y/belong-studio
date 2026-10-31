@@ -8,11 +8,16 @@ export interface GeneratedImage {
 
 /**
  * Abstracción de proveedores de generación de imágenes.
- * IMAGE_PROVIDER=gemini (default) usa Gemini 2.5 Flash Image ("Nano Banana").
+ * IMAGE_PROVIDER=openrouter (default) usa el endpoint /images/generations de OpenRouter
+ * con el modelo google/gemini-3.1-flash-image (último modelo de imagen disponible).
+ * Nota: Kimi NO genera imágenes (verificado: modelos con salida solo texto) — Kimi se usa
+ * para todo el procesamiento de texto; las imágenes van por OpenRouter con la key existente.
  */
 export async function generateImages(prompts: string[]): Promise<GeneratedImage[]> {
-  const provider = process.env.IMAGE_PROVIDER || "gemini";
+  const provider = process.env.IMAGE_PROVIDER || "openrouter";
   switch (provider) {
+    case "openrouter":
+      return generateWithOpenRouter(prompts);
     case "gemini":
       return generateWithGemini(prompts);
     case "none":
@@ -20,6 +25,49 @@ export async function generateImages(prompts: string[]): Promise<GeneratedImage[
     default:
       throw new Error(`Proveedor de imágenes desconocido: ${provider}`);
   }
+}
+
+/** Último modelo de imagen disponible en OpenRouter (actualizar según /models). */
+const OPENROUTER_IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || "google/gemini-3.1-flash-image";
+
+async function generateWithOpenRouter(prompts: string[]): Promise<GeneratedImage[]> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error("Falta la configuración de generación de imágenes (OPENROUTER_API_KEY).");
+  const url = "https://openrouter.ai/api/v1/images/generations";
+  const results: GeneratedImage[] = [];
+  for (const prompt of prompts) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model: OPENROUTER_IMAGE_MODEL, prompt, n: 1 }),
+      });
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => "")).slice(0, 200);
+        throw new Error(`El generador de imágenes respondió con error (${res.status}). ${detail}`);
+      }
+      const data = await res.json();
+      const item = data?.data?.[0];
+      const b64: string | undefined = item?.b64_json;
+      const imgUrl: string | undefined = item?.url;
+      let buffer: Buffer | null = null;
+      if (b64) {
+        buffer = Buffer.from(b64, "base64");
+      } else if (imgUrl) {
+        const imgRes = await fetch(imgUrl);
+        if (!imgRes.ok) throw new Error("No se pudo descargar la imagen generada.");
+        buffer = Buffer.from(await imgRes.arrayBuffer());
+      }
+      if (!buffer) throw new Error("El generador de imágenes no devolvió ninguna imagen.");
+      results.push(await optimize(buffer));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return results;
 }
 
 async function generateWithGemini(prompts: string[]): Promise<GeneratedImage[]> {
