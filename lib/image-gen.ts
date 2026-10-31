@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { callKimiRaw } from "./kimi";
 
 export interface GeneratedImage {
   buffer: Buffer;
@@ -8,14 +9,15 @@ export interface GeneratedImage {
 
 /**
  * Abstracción de proveedores de generación de imágenes.
- * IMAGE_PROVIDER=openrouter (default) usa el endpoint /images/generations de OpenRouter
- * con el modelo google/gemini-3.1-flash-image (último modelo de imagen disponible).
- * Nota: Kimi NO genera imágenes (verificado: modelos con salida solo texto) — Kimi se usa
- * para todo el procesamiento de texto; las imágenes van por OpenRouter con la key existente.
+ * IMAGE_PROVIDER=kimi (default): Kimi genera ilustraciones SVG (es un modelo de texto/code —
+ * NO genera imágenes raster, verificado). Las imágenes son vectoriales/ilustración plana.
+ * Alternativas opt-in: "openrouter" (modelos de imagen reales, requiere créditos) o "gemini".
  */
 export async function generateImages(prompts: string[]): Promise<GeneratedImage[]> {
-  const provider = process.env.IMAGE_PROVIDER || "openrouter";
+  const provider = process.env.IMAGE_PROVIDER || "kimi";
   switch (provider) {
+    case "kimi":
+      return generateWithKimi(prompts);
     case "openrouter":
       return generateWithOpenRouter(prompts);
     case "gemini":
@@ -25,6 +27,45 @@ export async function generateImages(prompts: string[]): Promise<GeneratedImage[
     default:
       throw new Error(`Proveedor de imágenes desconocido: ${provider}`);
   }
+}
+
+const KIMI_SVG_SYSTEM = `Eres un ilustrador vectorial senior. Generas ilustraciones SVG completas, autocontenidas y de alta calidad estética.
+REGLAS ESTRICTAS:
+- Responde ÚNICAMENTE con el código SVG. Nada de explicaciones, nada de markdown fences.
+- El SVG debe tener viewBox, todos los estilos inline (sin clases externas ni <style> con selectores complejos), sin scripts, sin imágenes externas, sin fuentes externas (si hay texto, usa font-family genérica de sistema).
+- Estilo: ilustración editorial plana/moderna, paleta cálida y profesional (cremas, dorados, carbón, terracota suave), composición equilibrada, detalles cuidados. Apto para el encabezado de un artículo de una fundación de equidad de género y pertenencia en el trabajo.
+- EVITA: líneas punteadas flotantes, bocadillos de diálogo, manos detalladas (usa brazos simples, manos ocultas o posiciones de cuerpo donde las manos no sean el foco), texto dentro de la imagen, elementos cortados en los bordes.
+- Tamaño sugerido: viewBox="0 0 1600 900".`;
+
+function extractSvg(raw: string): string {
+  const cleaned = raw.replace(/```(?:svg)?\s*/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("<svg");
+  const end = cleaned.lastIndexOf("</svg>");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("El asistente no devolvió una ilustración válida.");
+  }
+  const svg = cleaned.slice(start, end + 6);
+  if (/<script[\s>]/i.test(svg)) throw new Error("La ilustración generada no pasó la validación de seguridad.");
+  return svg;
+}
+
+/** Modelo Kimi para ilustraciones (highspeed = mismo K2.7, mucho más rápido). */
+const KIMI_IMAGE_MODEL = process.env.KIMI_IMAGE_MODEL || "kimi-for-coding-highspeed";
+
+async function generateWithKimi(prompts: string[]): Promise<GeneratedImage[]> {
+  // en paralelo: la generación es lenta y Vercel limita el tiempo total de la función
+  return Promise.all(
+    prompts.map(async (prompt) => {
+      const raw = await callKimiRaw(
+        KIMI_SVG_SYSTEM,
+        `Genera UNA ilustración SVG para: ${prompt}`,
+        280_000,
+        KIMI_IMAGE_MODEL
+      );
+      const svg = extractSvg(raw);
+      return { buffer: Buffer.from(svg, "utf-8"), mime: "image/svg+xml", extension: ".svg" };
+    })
+  );
 }
 
 /** Último modelo de imagen disponible en OpenRouter (actualizar según /models). */

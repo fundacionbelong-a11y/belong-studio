@@ -42,6 +42,45 @@ export interface PublishResult {
 const KIMI_URL = "https://api.kimi.com/coding/v1/chat/completions";
 const MODEL = process.env.KIMI_MODEL || "kimi-k2.7-code";
 
+/** Llamada genérica a Kimi: devuelve el texto crudo de la respuesta. */
+export async function callKimiRaw(
+  systemPrompt: string,
+  userPrompt: string,
+  timeoutMs = 280_000,
+  model?: string
+): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(KIMI_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getApiKey()}`,
+        "x-canary-kfc": "always",
+      },
+      body: JSON.stringify({
+        model: model || MODEL,
+        temperature: 1, // el modelo solo permite 1
+        reasoning: { effort: "low" }, // menos thinking = respuestas rápidas (SVG son largos)
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`El asistente respondió con error (${res.status}).${detail ? " Detalle: " + detail.slice(0, 200) : ""}`);
+    }
+    const data = await res.json();
+    return (data?.choices?.[0]?.message?.content ?? "").trim();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function getApiKey(): string {
   const key = process.env.KIMI_API_KEY;
   if (!key) throw new Error("Falta la configuración del asistente de texto (KIMI_API_KEY).");
