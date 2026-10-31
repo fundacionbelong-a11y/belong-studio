@@ -97,10 +97,10 @@ export async function POST(req: NextRequest) {
     if (answers.images === "generate") {
       const prompts = await generateImagePrompts(rawText, article, answers.imageCount!, answers.imageStyle);
       const imgs = await generateImages(prompts);
-      imagePaths = imgs.map((_, i) => `/images/blog/${article.slug}/img-${i + 1}.webp`);
+      imagePaths = imgs.map((img, i) => `/images/blog/${article.slug}/img-${i + 1}${img.extension}`);
       imageFiles.push(
         ...imgs.map((img, i) => ({
-          path: `public/images/blog/${article.slug}/img-${i + 1}.webp`,
+          path: `public/images/blog/${article.slug}/img-${i + 1}${img.extension}`,
           content: img.buffer.toString("base64"),
           encoding: "base64" as const,
         }))

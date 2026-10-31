@@ -189,12 +189,15 @@ export async function generateImagePrompts(
         messages: [
           {
             role: "system",
-            content:
-              "Eres un director de arte. Genera prompts de imagen para un generador de imágenes (Gemini Flash Image). Responde ÚNICAMENTE con un array JSON de strings, sin texto extra. Estilo Belong: cálido, humano, diverso, profesional, luz natural, sin texto en las imágenes.",
+            content: process.env.IMAGE_PROVIDER === "kimi"
+              ? "Eres un director de arte. Genera descripciones de ESCENAS para que un ilustrador vectorial las dibuje en SVG. Responde ÚNICAMENTE con un array JSON de strings, sin texto extra. Cada descripción: escena clara, composición, elementos visuales concretos, paleta cálida (cremas, dorados, carbón, terracota). Sin texto dentro de la imagen."
+              : "Eres un director de arte. Genera prompts de imagen para un generador de imágenes (Gemini Flash Image). Responde ÚNICAMENTE con un array JSON de strings, sin texto extra. Estilo Belong: cálido, humano, diverso, profesional, luz natural, sin texto en las imágenes.",
           },
           {
             role: "user",
-            content: `Artículo: "${article.title}". Resumen: ${article.excerpt}\n\nEscribe ${count} prompts de imagen (uno por elemento del array), en inglés, descriptivos, fotográficos/editoriales.${style ? ` Estilo deseado por la autora: ${style}.` : ""}`,
+            content: process.env.IMAGE_PROVIDER === "kimi"
+              ? `Artículo: "${article.title}". Resumen: ${article.excerpt}\n\nEscribe ${count} descripciones de escenas para ilustrar el artículo (una por elemento del array), en español, pensadas para ilustración plana/vectorial: personas, lugares y momentos concretos que representen las ideas del texto.${style ? ` Ambiente deseado por la autora: ${style}.` : ""}`
+              : `Artículo: "${article.title}". Resumen: ${article.excerpt}\n\nEscribe ${count} prompts de imagen (uno por elemento del array), en inglés, descriptivos, fotográficos/editoriales.${style ? ` Estilo deseado por la autora: ${style}.` : ""}`,
           },
         ],
       }),
