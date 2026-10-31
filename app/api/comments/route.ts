@@ -91,17 +91,23 @@ function parseComment(node: GqlCommentNode): ParsedComment {
 }
 
 async function findDiscussionBySlug(slug: string): Promise<{ id: string } | null> {
+  // Listamos las discussions de la categoría y filtramos por título exacto.
+  // (GitHub search tokeniza los guiones: "ladies-first" => ladies NOT first.)
   const data = await ghGraphql<{
-    search: { nodes: { id: string; title: string }[] };
+    repository: {
+      discussions: { nodes: { id: string; title: string }[] };
+    };
   }>(
-    `query($query: String!) {
-      search(query: $query, type: DISCUSSION, first: 10) {
-        nodes { ... on Discussion { id title } }
+    `query($owner: String!, $name: String!, $categoryId: ID!) {
+      repository(owner: $owner, name: $name) {
+        discussions(first: 100, categoryId: $categoryId) {
+          nodes { id title }
+        }
       }
     }`,
-    { query: `repo:${REPO_OWNER}/${REPO_NAME} type:discussions in:title ${slug}` }
+    { owner: REPO_OWNER, name: REPO_NAME, categoryId: CATEGORY_ID }
   );
-  const found = (data.search?.nodes || []).find((n) => n.title === slug);
+  const found = (data.repository?.discussions?.nodes || []).find((n) => n.title === slug);
   return found ? { id: found.id } : null;
 }
 
