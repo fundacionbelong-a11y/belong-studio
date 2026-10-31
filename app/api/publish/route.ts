@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     ];
     const commit = await commitFiles(files, `feat(content): ${article.slug} via Belong Studio`);
     result.commit = commit;
-    result.articleUrl = `https://fundacionbelong.org/conocimiento/${article.slug}/`;
+    result.articleUrl = `https://fundacionbelong.org/conocimiento/blog/${article.slug}/`;
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ ok: false, error: friendlyError(e) }, { status: 500 });
