@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface UploadedImage {
   dataUrl: string;
@@ -31,6 +31,8 @@ interface ApiResult {
 export default function Wizard() {
   const [step, setStep] = useState(1);
   const [rawText, setRawText] = useState("");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const DRAFT_KEY = "belong-studio-draft";
   const [verticals, setVerticals] = useState<string[]>([]);
   const [articleType, setArticleType] = useState("");
   const [otherType, setOtherType] = useState("");
@@ -160,25 +162,71 @@ export default function Wizard() {
     e.target.value = "";
   }
 
+  // ---- autoguardado del borrador (localStorage) ----
+  const draftLoaded = useRef(false);
+  useEffect(() => {
+    if (draftLoaded.current) return;
+    draftLoaded.current = true;
+    try {
+      const draft = localStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        setRawText(draft);
+        setSavedAt(new Date());
+      }
+    } catch { /* almacenamiento no disponible */ }
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const t = setTimeout(() => {
+      try {
+        if (rawText.trim()) {
+          localStorage.setItem(DRAFT_KEY, rawText);
+          setSavedAt(new Date());
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+          setSavedAt(null);
+        }
+      } catch { /* noop */ }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [rawText]);
+
+  // Limpieza amigable de texto: normaliza espacios, saltos de línea y viñetas comunes de WhatsApp/Notas.
+  function magicFormat() {
+    const cleaned = rawText
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((l) => l.replace(/[ \t]+/g, " ").trimEnd())
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    setRawText(cleaned);
+  }
+
+  const charCount = rawText.trim().length;
+  const wordCount = rawText.trim() ? rawText.trim().split(/\s+/).length : 0;
+  const readingMin = wordCount ? Math.max(1, Math.round(wordCount / 200)) : 0;
+
   const card = (selected: boolean) =>
     `rounded-xl border-2 p-4 text-left font-medium transition cursor-pointer ${
       selected
-        ? "border-amber-700 bg-amber-50 text-amber-900"
-        : "border-stone-200 bg-white hover:border-amber-400"
+        ? "border-olive-600 bg-olive-300/20 text-olive-700"
+        : "border-stone-200 bg-white hover:border-olive-400"
     }`;
 
   const toggle = (on: boolean, set: (v: boolean) => void, label: string, desc: string) => (
     <button
       type="button"
       onClick={() => set(!on)}
-      className={`w-full flex items-center justify-between rounded-xl border-2 p-4 ${on ? "border-amber-700 bg-amber-50" : "border-stone-200 bg-white"}`}
+      className={`w-full flex items-center justify-between rounded-xl border-2 p-4 ${on ? "border-olive-600 bg-amber-50" : "border-stone-200 bg-white"}`}
     >
       <span>
         <span className="block font-medium">{label}</span>
         <span className="block text-sm text-stone-500">{desc}</span>
       </span>
       <span
-        className={`w-11 h-6 rounded-full relative transition ${on ? "bg-amber-700" : "bg-stone-300"}`}
+        className={`w-11 h-6 rounded-full relative transition ${on ? "bg-olive-600" : "bg-stone-300"}`}
       >
         <span
           className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`}
@@ -187,51 +235,96 @@ export default function Wizard() {
     </button>
   );
 
+  const STEP_LABELS = ["Tu texto", "Detalles del artículo", "Vista previa"];
+
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+    <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
+      {/* barra superior */}
+      <header className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="font-display text-2xl md:text-3xl text-ink-900">Belong Studio</h1>
+          <p className="text-sm text-ink-500 mt-0.5">Hola Pamela — publica tus artículos directamente en fundacionbelong.org</p>
+        </div>
+        {savedAt && step === 1 && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-ink-500 bg-white rounded-full px-3 py-1.5 shadow-soft border border-pearl-200 mt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-olive-500"></span>
+            Guardado automáticamente · {savedAt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
+      </header>
+
       {/* indicador de pasos */}
       {step < 4 && (
-        <div className="flex gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full ${s <= step ? "bg-amber-700" : "bg-stone-200"}`}
-            />
-          ))}
+        <div className="mb-6">
+          <div className="flex gap-2 mb-2">
+            {[1, 2, 3].map((s) => (
+              <div
+                key={s}
+                className={"h-1.5 flex-1 rounded-full " + (s <= step ? "bg-olive-500" : "bg-pearl-200")}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-ink-500">
+            Paso {Math.min(step, 3)} de 3 · {STEP_LABELS[step - 1]}
+          </p>
         </div>
       )}
 
+      <div className="bg-white rounded-[1.25rem] shadow-lift border border-pearl-200 p-6 md:p-8">
+
       {step === 1 && (
         <div>
-          <h2 className="text-xl font-semibold mb-1">Paso 1 · Tu texto</h2>
-          <p className="text-sm text-stone-500 mb-4">
+          <h2 className="font-display text-xl md:text-2xl text-ink-900 mb-1">Paso 1 · Tu texto</h2>
+          <p className="text-sm text-ink-500 mb-5">
             Pega aquí tu texto tal como lo escribiste (desde WhatsApp, Notas, donde sea). Nosotros le
             damos formato.
           </p>
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            rows={14}
-            placeholder="Escribe o pega tu artículo aquí…"
-            className="w-full rounded-xl border border-stone-300 p-4 focus:outline-none focus:ring-2 focus:ring-amber-600 text-base leading-relaxed"
-          />
-          <p className="text-xs text-stone-400 mt-1">{rawText.trim().length} caracteres</p>
-          {error && <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-3">{error}</p>}
-          <div className="flex justify-end mt-4">
+
+          {/* cuadro de texto flotante */}
+          <div className="relative rounded-2xl border border-pearl-200 bg-cream-50 shadow-soft focus-within:shadow-lift focus-within:border-olive-300 transition-all">
+            <textarea
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
+              rows={16}
+              placeholder="Escribe o pega tu artículo aquí…"
+              className="w-full bg-transparent p-5 md:p-6 focus:outline-none text-base leading-relaxed text-ink-900 placeholder:text-ink-300 resize-y min-h-[320px]"
+            />
+            {/* estadísticas flotantes */}
+            <div className="pointer-events-none absolute bottom-3 right-4 flex items-center gap-3 text-[11px] text-ink-500 bg-white/80 backdrop-blur rounded-full px-3 py-1 shadow-soft border border-pearl-200">
+              <span>{charCount.toLocaleString("es-CO")} caracteres</span>
+              {readingMin > 0 && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-ink-300"></span>
+                  <span>Lectura ~{readingMin} min</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-4">
+            <button
+              onClick={magicFormat}
+              disabled={!rawText.trim()}
+              title="Limpia espacios y saltos de línea extra de forma automática"
+              className="inline-flex items-center gap-2 text-sm font-medium text-olive-700 bg-olive-300/15 border border-olive-300/40 rounded-full px-4 py-2 hover:bg-olive-300/30 hover:shadow-soft disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span aria-hidden>✨</span> Formato mágico
+            </button>
             <button
               onClick={() => setStep(2)}
               disabled={!step1Valid}
-              className="bg-amber-700 hover:bg-amber-800 text-white rounded-lg px-6 py-2.5 font-medium disabled:opacity-40 transition"
+              className="inline-flex items-center gap-2 bg-olive-600 hover:bg-olive-700 text-white rounded-xl px-6 py-3 font-medium shadow-soft hover:shadow-lift hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
             >
-              Continuar
+              Continuar <span aria-hidden>→</span>
             </button>
           </div>
+          {error && <p className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-3">{error}</p>}
         </div>
       )}
 
       {step === 2 && (
         <div className="space-y-6">
-          <h2 className="text-xl font-semibold">Paso 2 · Cuéntanos del artículo</h2>
+          <h2 className="font-display text-xl md:text-2xl text-ink-900">Paso 2 · Cuéntanos del artículo</h2>
 
           <div>
             <h3 className="font-medium mb-2">¿Para qué es el contenido? (elige hasta 2)</h3>
@@ -258,7 +351,7 @@ export default function Wizard() {
                 value={otherType}
                 onChange={(e) => setOtherType(e.target.value)}
                 placeholder="Cuéntanos: ¿qué tipo es?"
-                className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-olive-500"
               />
             )}
           </div>
@@ -279,7 +372,7 @@ export default function Wizard() {
                   value={newSectionName}
                   onChange={(e) => setNewSectionName(e.target.value)}
                   placeholder="Nombre de la nueva sección (ej: Historias, Recursos, Prensa…)"
-                  className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                  className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-olive-500"
                 />
                 <p className="text-xs text-stone-400 mt-1">
                   Tu artículo abrirá esta sección y los siguientes contenidos podrán ir a ella.
@@ -311,7 +404,7 @@ export default function Wizard() {
                       <button
                         key={n}
                         onClick={() => setImageCount(n)}
-                        className={`w-10 h-10 rounded-lg border-2 font-medium ${imageCount === n ? "border-amber-700 bg-amber-50" : "border-stone-200 bg-white"}`}
+                        className={`w-10 h-10 rounded-lg border-2 font-medium ${imageCount === n ? "border-olive-600 bg-amber-50" : "border-stone-200 bg-white"}`}
                       >
                         {n}
                       </button>
@@ -326,7 +419,7 @@ export default function Wizard() {
                     value={imageStyle}
                     onChange={(e) => setImageStyle(e.target.value)}
                     placeholder="Ej: fotos cálidas de personas trabajando en equipo…"
-                    className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                    className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-olive-500"
                   />
                 </div>
               </div>
@@ -335,7 +428,7 @@ export default function Wizard() {
             {imageChoice === "upload" && (
               <div className="mt-3 space-y-3 rounded-xl bg-stone-50 p-4">
                 <label className="block">
-                  <span className="inline-block bg-white border-2 border-dashed border-stone-300 rounded-xl px-4 py-3 text-sm cursor-pointer hover:border-amber-600">
+                  <span className="inline-block bg-white border-2 border-dashed border-stone-300 rounded-xl px-4 py-3 text-sm cursor-pointer hover:border-olive-500">
                     Elegir imágenes (máx. 8 MB c/u)
                   </span>
                   <input
@@ -389,9 +482,9 @@ export default function Wizard() {
             <button
               onClick={handlePreview}
               disabled={!step2Valid || loading}
-              className="bg-amber-700 hover:bg-amber-800 text-white rounded-lg px-6 py-2.5 font-medium disabled:opacity-40 transition"
+              className="inline-flex items-center gap-2 bg-olive-600 hover:bg-olive-700 text-white rounded-xl px-6 py-3 font-medium shadow-soft hover:shadow-lift hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
             >
-              {loading ? "Preparando vista previa…" : "Ver vista previa"}
+              {loading ? "Preparando vista previa…" : "Ver vista previa →"}
             </button>
           </div>
         </div>
@@ -399,7 +492,7 @@ export default function Wizard() {
 
       {step === 3 && result && (
         <div className="space-y-5">
-          <h2 className="text-xl font-semibold">Paso 3 · Revisa tu artículo</h2>
+          <h2 className="font-display text-xl md:text-2xl text-ink-900">Paso 3 · Revisa tu artículo</h2>
 
           <div className="grid gap-3">
             <div>
@@ -448,14 +541,14 @@ export default function Wizard() {
               <button
                 onClick={handleRegenerate}
                 disabled={loading}
-                className="border border-amber-700 text-amber-800 rounded-lg px-4 py-2.5 font-medium hover:bg-amber-50 disabled:opacity-40 transition"
+                className="border border-olive-300 text-olive-700 rounded-xl px-4 py-2.5 font-medium hover:bg-olive-300/20 disabled:opacity-40"
               >
                 {loading ? "…" : "Regenerar título/excerpt"}
               </button>
               <button
                 onClick={handlePublish}
                 disabled={loading}
-                className="bg-amber-700 hover:bg-amber-800 text-white rounded-lg px-6 py-2.5 font-medium disabled:opacity-40 transition"
+                className="inline-flex items-center gap-2 bg-olive-600 hover:bg-olive-700 text-white rounded-xl px-6 py-3 font-medium shadow-soft hover:shadow-lift hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
               >
                 {loading ? "Publicando…" : "Publicar 🎉"}
               </button>
@@ -467,25 +560,27 @@ export default function Wizard() {
       {step === 4 && published && result?.articleUrl && (
         <div className="text-center py-8">
           <div className="text-5xl mb-4">🎉</div>
-          <h2 className="text-2xl font-semibold mb-2">¡Tu artículo está publicado!</h2>
-          <p className="text-stone-600 mb-1">
+          <h2 className="font-display text-2xl md:text-3xl text-ink-900 mb-2">¡Tu artículo está publicado!</h2>
+          <p className="text-ink-500 mb-1">
             En unos minutos estará en vivo (el sitio se está actualizando).
           </p>
           <a
             href={result.articleUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="block text-amber-800 underline text-lg my-4"
+            className="block text-olive-700 underline text-lg my-4 hover:text-olive-600"
           >
             Ver mi artículo en fundacionbelong.org
           </a>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-ink-500">
             ✨ No olvides compartirlo en tus redes. ¡Gracias por escribir para Belong!
           </p>
           <button
             onClick={() => {
               setStep(1);
               setRawText("");
+              setSavedAt(null);
+              try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
               setResult(null);
               setPublished(false);
               setVerticals([]);
@@ -495,12 +590,13 @@ export default function Wizard() {
               setImageChoice("none");
               setUploads([]);
             }}
-            className="mt-6 text-stone-500 hover:underline"
+            className="mt-6 text-ink-500 hover:text-terra-600 hover:underline"
           >
             Escribir otro artículo
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

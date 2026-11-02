@@ -1,13 +1,68 @@
 @import "tailwindcss";
 
-:root {
-  --cream: #faf7f2;
-  --charcoal: #2b2620;
-  --gold: #b8860b;
+@theme {
+  /* Tipografía */
+  --font-display: var(--font-display), Georgia, serif;
+  --font-sans: var(--font-body), system-ui, sans-serif;
+
+  /* Paleta cálida y profesional */
+  --color-cream-50: #fdfcf9;
+  --color-cream-100: #faf8f3;
+  --color-cream-200: #f4f1e9;
+  --color-pearl-100: #f6f5f2;
+  --color-pearl-200: #efedeb;
+
+  --color-ink-900: #2b2824;
+  --color-ink-700: #4a453e;
+  --color-ink-500: #7a736a;
+  --color-ink-300: #b5aea3;
+
+  --color-olive-300: #a8b47e;
+  --color-olive-400: #8b9a5e;
+  --color-olive-500: #6f7f46;
+  --color-olive-600: #5a6839;
+  --color-olive-700: #47542e;
+
+  --color-terra-300: #dfa88e;
+  --color-terra-400: #cd8563;
+  --color-terra-500: #b96a48;
+  --color-terra-600: #9e5537;
+
+  /* Sombras suaves */
+  --shadow-soft: 0 1px 2px rgba(43, 40, 36, 0.04), 0 8px 24px rgba(43, 40, 36, 0.06);
+  --shadow-lift: 0 2px 4px rgba(43, 40, 36, 0.05), 0 12px 32px rgba(43, 40, 36, 0.1);
+
+  /* Radios */
+  --radius-xl2: 1.25rem;
 }
 
 body {
-  background: var(--cream);
-  color: var(--charcoal);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--color-cream-100);
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(168, 180, 126, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(223, 168, 142, 0.07), transparent 60%);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Títulos con serif elegante */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Transiciones base suaves */
+button, a, input, textarea, select {
+  transition: all 0.18s ease;
+}
+
+::selection {
+  background: rgba(168, 180, 126, 0.35);
+}
+
+/* Scrollbar discreta */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-300) transparent;
 }
