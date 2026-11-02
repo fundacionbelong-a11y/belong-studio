@@ -39,6 +39,24 @@ export async function POST(req: NextRequest) {
   const dryRun = input.dryRun === true || process.env.DRY_RUN === "true";
   const { rawText, answers, overrides } = input;
 
+  // ---- sección destino ----
+  // blog: sección existente (default). nueva: Pamela nombra una sección nueva;
+  // se crea el directorio content/<slug> y el sitio la sirve automáticamente.
+  const sectionAnswer = answers.section || { kind: "blog" as const };
+  let section = "blog";
+  let sectionName = "Blog";
+  if (sectionAnswer.kind === "nueva") {
+    const name = (sectionAnswer.name || "").trim();
+    if (name.length < 3 || name.length > 60) {
+      return NextResponse.json({ error: "Escribe el nombre de la nueva sección (entre 3 y 60 caracteres)." }, { status: 400 });
+    }
+    section = slugify(name);
+    if (!section) {
+      return NextResponse.json({ error: "No se pudo crear un identificador para la sección. Prueba con otro nombre." }, { status: 400 });
+    }
+    sectionName = name;
+  }
+
   // ---- validación ----
   if (!rawText || rawText.trim().length < 30) {
     return NextResponse.json({ error: "El texto es demasiado corto. Pega el contenido completo del artículo." }, { status: 400 });
@@ -130,6 +148,8 @@ export async function POST(req: NextRequest) {
       excerpt: article.excerpt,
       tags: article.tags,
       verticals: answers.verticals.slice(0, 2),
+      section,
+      sectionName,
       bodyMarkdown: article.bodyMarkdown,
       imagePath: imagePaths[0] ?? null,
       comments: answers.comments !== false,
@@ -155,12 +175,12 @@ export async function POST(req: NextRequest) {
 
     // ---- commit atómico a GitHub ----
     const files: FileEntry[] = [
-      { path: `content/blog/${article.slug}.mdx`, content: mdx, encoding: "utf-8" },
+      { path: `content/${section}/${article.slug}.mdx`, content: mdx, encoding: "utf-8" },
       ...imageFiles,
     ];
     const commit = await commitFiles(files, `feat(content): ${article.slug} via Belong Studio`);
     result.commit = commit;
-    result.articleUrl = `https://fundacionbelong.org/conocimiento/blog/${article.slug}/`;
+    result.articleUrl = `https://fundacionbelong.org/conocimiento/${section}/${article.slug}/`;
     return NextResponse.json(result);
   } catch (e) {
     return NextResponse.json({ ok: false, error: friendlyError(e) }, { status: 500 });

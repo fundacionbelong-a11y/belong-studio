@@ -12,6 +12,7 @@ const VERTICALES = ["Experiencias", "Formatos", "Frameworks", "Opinión"];
 const TIPOS = ["Reflexión", "Caso/Experiencia", "Guía práctica", "Análisis", "Noticia/comunicado", "Otro"];
 
 type ImageChoice = "generate" | "upload" | "none";
+type SectionChoice = "blog" | "nueva";
 
 interface ApiResult {
   ok: boolean;
@@ -33,6 +34,8 @@ export default function Wizard() {
   const [verticals, setVerticals] = useState<string[]>([]);
   const [articleType, setArticleType] = useState("");
   const [otherType, setOtherType] = useState("");
+  const [sectionChoice, setSectionChoice] = useState<SectionChoice>("blog");
+  const [newSectionName, setNewSectionName] = useState("");
   const [imageChoice, setImageChoice] = useState<ImageChoice>("none");
   const [imageCount, setImageCount] = useState(2);
   const [imageStyle, setImageStyle] = useState("");
@@ -54,6 +57,7 @@ export default function Wizard() {
   const step2Valid =
     verticals.length > 0 &&
     (articleType !== "Otro" || otherType.trim().length > 0) &&
+    (sectionChoice !== "nueva" || newSectionName.trim().length >= 3) &&
     (imageChoice !== "upload" || uploads.length > 0);
 
   function toggleVertical(v: string) {
@@ -71,6 +75,10 @@ export default function Wizard() {
         answers: {
           verticals,
           articleType: articleType === "Otro" ? `Otro: ${otherType.trim()}` : articleType,
+          section:
+            sectionChoice === "nueva"
+              ? { kind: "nueva", name: newSectionName.trim() }
+              : { kind: "blog" },
           images: imageChoice,
           imageCount: imageChoice === "generate" ? imageCount : undefined,
           imageStyle: imageChoice === "generate" ? imageStyle : undefined,
@@ -252,6 +260,31 @@ export default function Wizard() {
                 placeholder="Cuéntanos: ¿qué tipo es?"
                 className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600"
               />
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-2">¿Dónde va a vivir este contenido?</h3>
+            <div className="grid gap-2">
+              <button onClick={() => setSectionChoice("blog")} className={card(sectionChoice === "blog")}>
+                Blog — Conocimiento (sección actual de artículos)
+              </button>
+              <button onClick={() => setSectionChoice("nueva")} className={card(sectionChoice === "nueva")}>
+                Es una sección nueva del sitio
+              </button>
+            </div>
+            {sectionChoice === "nueva" && (
+              <div className="mt-2">
+                <input
+                  value={newSectionName}
+                  onChange={(e) => setNewSectionName(e.target.value)}
+                  placeholder="Nombre de la nueva sección (ej: Historias, Recursos, Prensa…)"
+                  className="w-full rounded-lg border border-stone-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-600"
+                />
+                <p className="text-xs text-stone-400 mt-1">
+                  Tu artículo abrirá esta sección y los siguientes contenidos podrán ir a ella.
+                </p>
+              </div>
             )}
           </div>
 
@@ -457,6 +490,8 @@ export default function Wizard() {
               setPublished(false);
               setVerticals([]);
               setArticleType("");
+              setSectionChoice("blog");
+              setNewSectionName("");
               setImageChoice("none");
               setUploads([]);
             }}

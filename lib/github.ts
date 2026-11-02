@@ -11,6 +11,8 @@ export interface MdxInput {
   excerpt: string;
   tags: string[];
   verticals: string[];
+  section: string; // directorio bajo content/ ("blog" o slug de sección nueva)
+  sectionName: string; // nombre legible de la sección
   bodyMarkdown: string;
   imagePath: string | null;
   comments: boolean;
@@ -26,6 +28,8 @@ export function buildMdx(input: MdxInput): string {
     `excerpt: ${yamlString(input.excerpt)}`,
     `tags: [${input.tags.map((t) => yamlString(t)).join(", ")}]`,
     `verticals: [${input.verticals.map((v) => yamlString(v)).join(", ")}]`,
+    `section: ${yamlString(input.section)}`,
+    `sectionName: ${yamlString(input.sectionName)}`,
     `image: ${input.imagePath ? yamlString(input.imagePath) : "null"}`,
     `comments: ${input.comments}`,
     `share: ${input.share}`,

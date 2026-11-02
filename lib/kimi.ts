@@ -1,6 +1,7 @@
 export interface PublishAnswers {
   verticals: string[]; // hasta 2
   articleType: string; // o "Otro: ..."
+  section?: { kind: "blog" } | { kind: "nueva"; name: string }; // dónde vive el contenido
   images: "generate" | "upload" | "none";
   imageCount?: number; // 1-4 si generate
   imageStyle?: string;
@@ -107,6 +108,11 @@ function buildUserPrompt(rawText: string, answers: PublishAnswers, extra?: strin
   p += `CONTEXTO DEL WIZARD:\n`;
   p += `- Verticales: ${answers.verticals.join(", ") || "sin definir"}\n`;
   p += `- Tipo de artículo: ${answers.articleType}\n`;
+  if (answers.section?.kind === "nueva") {
+    p += `- Sección del sitio: NUEVA sección llamada "${answers.section.name}" (el artículo abre esta nueva sección)\n`;
+  } else {
+    p += `- Sección del sitio: Blog (Conocimiento)\n`;
+  }
   if (extra) p += `\nINSTRUCCIÓN ADICIONAL: ${extra}\n`;
   return p;
 }
